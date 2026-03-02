@@ -1,0 +1,7 @@
+{
+  "name": "Ponto Digital",
+  "description": "Aplicativo de registro de ponto eletrônico com interface moderna e intuitiva.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
