@@ -28,6 +28,7 @@ import {
   X
 } from 'lucide-react';
 import { PontoRecord, Screen, WorkSchedule, DaySchedule, UserRole, Employee } from './types';
+import { apiGet, apiPost } from './api';
 
 const MOCK_EMPLOYEES: Employee[] = [
   { id: 'emp1', name: 'João Silva', role: 'Desenvolvedor Full Stack', department: 'Engenharia', registration: '884291-0', hiringDate: '2022-01-15', salary: 5500 },
@@ -103,9 +104,20 @@ export default function App() {
   });
 
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+  return () => clearInterval(timer);
+}, []);
+
+useEffect(() => {
+  const run = async () => {
+    if (!currentUser) return;
+    const recs = await apiGet<any[]>(`/records?employeeId=${currentUser.id}`);
+    setRecords(recs.map(r => ({ ...r, timestamp: new Date(r.timestamp) })));
+  };
+
+  run().catch(console.error);
+}, [currentUser]);
+
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -126,7 +138,7 @@ export default function App() {
     return `${h}h ${m.toString().padStart(2, '0')}m`;
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     const userRecords = records.filter(r => r.employeeId === currentUser?.id);
     const lastRecord = userRecords[0];
     const newType = lastRecord?.type === 'Entrada' ? 'Saída' : 'Entrada';
@@ -167,39 +179,47 @@ export default function App() {
       type: newType,
       timestamp: new Date(),
       location: 'Sede Central - Bloco A',
-      isExtra,
-      extraPercentage
+      isExtra,     extraPercentage
     };
     
-    setRecords([newRecord, ...records]);
+    const saved = await apiPost<any>('/records', {
+  ...newRecord,
+  timestamp: new Date().toISOString(),
+});
+
+setRecords([{ ...saved, timestamp: new Date(saved.timestamp) }, ...records]);
+
   };
 
-  const handleEmployeeLogin = () => {
-    // Check for admin login first
-    if (loginName.toLowerCase() === 'admin' && loginRegistration === 'admin123') {
+  const handleEmployeeLogin = async () => {
+  try {
+    setEmployeeLoginError('');
+
+    const isAdmin = loginName.trim().toLowerCase() === 'admin';
+
+    const payload: any = {
+      name: loginName,
+      registration: loginRegistration,
+      ...(isAdmin ? { password: 'admin123' } : {}),
+    };
+
+    const result = await apiPost<any>('/auth/login', payload);
+
+    if (result.role === 'admin') {
       setCurrentUser(MOCK_ADMIN);
       setUserRole('admin');
-      setEmployeeLoginError('');
-      setLoginName('');
-      setLoginRegistration('');
       setCurrentScreen('reports');
-      return;
-    }
-
-    const employee = employees.find(
-      emp => emp.name.toLowerCase() === loginName.toLowerCase() && emp.registration === loginRegistration
-    );
-
-    if (employee) {
-      setCurrentUser(employee);
-      setUserRole('employee');
-      setEmployeeLoginError('');
-      setLoginName('');
-      setLoginRegistration('');
     } else {
-      setEmployeeLoginError('Nome ou matrícula não encontrados.');
+      setCurrentUser(result.employee);
+      setUserRole('employee');
     }
-  };
+
+    setLoginName('');
+    setLoginRegistration('');
+  } catch (e) {
+    setEmployeeLoginError('Nome ou matrícula não encontrados.');
+  }
+};
 
   const handleAddEmployee = (newEmployee: Omit<Employee, 'id'>) => {
     const employee: Employee = {
