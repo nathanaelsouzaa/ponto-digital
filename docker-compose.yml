@@ -1,0 +1,36 @@
+services:
+  api:
+    build:
+      context: ./api
+    container_name: ponto-api
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DB_PATH=/data/ponto.db
+      # Troque a senha do admin depois do primeiro deploy
+      - ADMIN_PASSWORD=admin123
+    volumes:
+      - ponto_data:/data
+    networks:
+      - ponto_net
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: ponto-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+    networks:
+      - ponto_net
+
+volumes:
+  ponto_data:
+
+networks:
+  ponto_net:
+    driver: bridge
